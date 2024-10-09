@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+storage/temp/*
+storage/output/*
+!storage/temp/.gitkeep
+!storage/output/.gitkeep
+zcommands.txt
