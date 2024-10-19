@@ -12,16 +12,19 @@ export const validateConversionRequest = async (
 
   if (!videoUrl) {
     res.status(400).json({ error: 'Video URL is required' });
+    return;
   }
 
   if (!ytdl.validateURL(videoUrl)) {
     res.status(400).json({ error: 'Invalid YouTube URL' });
+    return;
   }
 
   if (quality && !config.conversion.allowedQualities.includes(quality)) {
     res.status(400).json({ 
       error: `Invalid quality. Allowed values: ${config.conversion.allowedQualities.join(', ')}` 
     });
+    return;
   }
 
   next();

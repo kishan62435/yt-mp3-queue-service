@@ -24,8 +24,9 @@ export const errorHandler: ErrorRequestHandler = (
   }
 
   console.error('Unhandled error:', err);
-  
-  res.status(500).json({
-    error: 'Internal server error'
-  });
+  if (!res.headersSent){
+    res.status(500).json({
+      error: 'Internal server error'
+    });
+  }
 };

@@ -10,6 +10,7 @@
       "removeComments": true,
       "noImplicitAny": true,
       "strictNullChecks": true,
+      "strictPropertyInitialization": true,
       "strictFunctionTypes": true,
       "noImplicitThis": true,
       "noUnusedLocals": true,
@@ -28,6 +29,6 @@
     "paths": {
       "@/*": ["src/*"]
     },
-    "types": ["node", "express", "bull"],
+    "types": ["node", "express", "bull", "src/types/*"],
     "typeRoots": ["./node_modules/@types"]
   }
