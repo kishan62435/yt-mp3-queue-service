@@ -5,8 +5,10 @@ import { DownloadService } from './downloadService';
 import config from '../config/config';
 import path from 'path';
 import fs from 'fs';
+// import { AppError } from '../middleware/errorHandler';
 
 export class QueueService {
+  private static instance: QueueService;
   private queue: Queue.Queue;
   private downloadService: DownloadService;
 
@@ -26,12 +28,23 @@ export class QueueService {
         lockDuration: 300000, // 5 minutes
         stalledInterval: 30000,
         maxStalledCount: 1
+      },
+      limiter: {
+        max: config.worker.rateLimit.max,
+        duration: config.worker.rateLimit.duration,
       }
     });
 
     this.downloadService = new DownloadService();
     this.setupQueueProcessor();
     this.setupQueueEvents();
+  }
+
+  public static getInstance(): QueueService {
+    if (!QueueService.instance) {
+      QueueService.instance = new QueueService();
+    }
+    return QueueService.instance;
   }
 
   private setupQueueEvents() {
@@ -52,7 +65,7 @@ export class QueueService {
     });
 
     this.queue.on('failed', (job, error) => {
-      console.error('Job failed:', job.id, error);
+      console.error('Job failed:', job?.id, error);
     });
 
     this.queue.on('stalled', (job) => {
@@ -71,6 +84,20 @@ export class QueueService {
       const outputPath = path.join(config.storage.outputDir);
 
       try {
+        const metadata = await this.downloadService.getVideoMetadata(videoUrl);
+      
+        if(metadata.duration == 0){
+          await job.log('Invalid job: Bad request');
+          await job.progress(100); 
+          // throw new AppError(400, 'Live streams and Premieres are not allowed');
+          return {status: 400, message: 'Live streams and Premieres are not allowed'}
+        }
+        if (metadata.duration > config.conversion.maxDuration) {
+          // throw new AppError(400, "Video duration exceeds maximum allowed length");
+          await job.log('Invalid job: Bad request');
+          await job.progress(100); 
+          return {status: 400, message: 'Video duration exceeds maximum allowed length'}
+        }
         fs.mkdirSync(config.storage.outputDir, { recursive: true });
 
         // Start download and conversion
@@ -84,7 +111,9 @@ export class QueueService {
 
         await job.progress(100);
         
-        return { 
+        return {
+          status: 200,
+          message: 'Conversion completed successfully',
           outputPath: downloadedPath,
           metadata: {
             quality,
@@ -92,13 +121,13 @@ export class QueueService {
           }
         };
       } catch (error) {
-        console.error('Job processing error:', error);
-        throw new Error(`Processing failed: ${error.message}`);
+          console.error('Job processing error:', error);
+          throw new Error(`Processing failed: ${error.message}`);
       }
     });
   }
 
-  async addToQueue(videoUrl: string, quality: number): Promise<{ videoLink: string, metadata: any }> {
+  async addToQueue(videoUrl: string, quality: number): Promise<{ status: number, message:string, videoLink: string, metadata: any }> {
     try {
       // Get active job count
       const activeCount = await this.queue.getActiveCount();
@@ -129,38 +158,45 @@ export class QueueService {
 
       // Wait for job completion
       const result = await job.finished();
-      const videoLink = result.outputPath.replace(config.storage.outputDir, '/static');
+      const videoLink = result.status == 200 ? result.outputPath.replace(config.storage.outputDir, '/static') : null;
 
       return {
+        status: result.status,
+        message: result.message,
         videoLink,
         metadata: result.metadata
       };
     } catch (error) {
       console.error('Error processing conversion:', error);
-      throw new Error('Conversion failed: ' + error.message);
+      if(error.code == 400){
+        throw error;
+      }
+      else{
+        throw new Error('Conversion failed: ' + error.message);
+      }
     }
   }
 
-  async getJobStatus(jobId: string) {
-    try {
-      const job = await this.queue.getJob(jobId);
-      if (!job) {
-        throw new Error('Job not found');
-      }
-      
-      const state = await job.getState();
-      const progress = await job.progress();
-      
-      return {
-        id: job.id,
-        state,
-        progress,
-        data: job.data,
-        timestamp: job.timestamp
-      };
-    } catch (error) {
-      console.error('Error getting job status:', error);
-      throw new Error('Failed to get job status: ' + error.message);
-    }
-  }
 }
+// async getJobStatus(jobId: string) {
+//   try {
+//     const job = await this.queue.getJob(jobId);
+//     if (!job) {
+//       throw new Error('Job not found');
+//     }
+    
+//     const state = await job.getState();
+//     const progress = await job.progress();
+    
+//     return {
+//       id: job.id,
+//       state,
+//       progress,
+//       data: job.data,
+//       timestamp: job.timestamp
+//     };
+//   } catch (error) {
+//     console.error('Error getting job status:', error);
+//     throw new Error('Failed to get job status: ' + error.message);
+//   }
+// }

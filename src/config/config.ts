@@ -1,9 +1,12 @@
+// src/config/config.ts
+
+import { AppConfig } from '../types/config';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-export default {
-    port: process.env.PORT || 3000,
+const config: AppConfig = {
+    port: Number(process.env.PORT) || 3000,
     redis: {
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379'),
@@ -22,7 +25,7 @@ export default {
     },
     rateLimit: {
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 100 // limit each IP to 100 requests per windowMs
+      max: 1000 // limit each IP to 100 requests per windowMs
     },
     queue: {
       maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS || '5'),
@@ -30,7 +33,7 @@ export default {
     },
     // Worker configuration
     worker: {
-      concurrency: parseInt(process.env.WORKER_CONCURRENCY || '2'),
+      concurrency: parseInt(process.env.WORKER_CONCURRENCY || '3'),
       rateLimit: {
         max: parseInt(process.env.WORKER_RATE_LIMIT_MAX || '10'),
         duration: parseInt(process.env.WORKER_RATE_LIMIT_DURATION || '600000') // 1 minute
@@ -46,3 +49,4 @@ export default {
       metricsInterval: parseInt(process.env.METRICS_INTERVAL || '15000') // 15 seconds
     }
   };
+ export default config;
